@@ -1,7 +1,13 @@
 from sqlalchemy import Column, Integer, String, Text, DateTime, JSON, ForeignKey, Boolean
 from sqlalchemy.orm import relationship
 from app.database import Base
-from datetime import datetime
+from datetime import datetime, timezone, timedelta
+
+# Default Singapore timezone (UTC+8)
+SGT = timezone(timedelta(hours=8))
+
+def now_sgt() -> datetime:
+    return datetime.now(SGT)
 
 class Module(Base):
     __tablename__ = "modules"
@@ -18,10 +24,11 @@ class Module(Base):
     # Aggregated sentiment analysis results
     sentiment_data = Column(JSON)  # {workload: 4.2, difficulty: 3.8, summary: "...", advice: "..."}
     last_analyzed = Column(DateTime)
+    last_comment_count = Column(Integer, default=0)
     
     # Timestamps
-    created_at = Column(DateTime, default=datetime.utcnow)
-    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    created_at = Column(DateTime, default=now_sgt)
+    updated_at = Column(DateTime, default=now_sgt, onupdate=now_sgt)
     
     # Relationship
     comments = relationship("Comment", back_populates="module", cascade="all, delete-orphan")
@@ -35,7 +42,7 @@ class Comment(Base):
     text = Column(Text, nullable=False)
     posted_date = Column(DateTime)
     upvotes = Column(Integer, default=0)
-    scraped_at = Column(DateTime, default=datetime.utcnow)
+    scraped_at = Column(DateTime, default=now_sgt)
     
     # Relationship
     module = relationship("Module", back_populates="comments")

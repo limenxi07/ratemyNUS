@@ -1,6 +1,7 @@
 from playwright.sync_api import sync_playwright, TimeoutError as PlaywrightTimeout
 from bs4 import BeautifulSoup
 from typing import Optional, Tuple, List, Dict
+from datetime import datetime
 import logging
 import time
 
@@ -68,6 +69,7 @@ def extract_disqus_url(html: str, module_code: str) -> Optional[str]:
 def fetch_disqus_comments(disqus_url: str) -> Tuple[Optional[str], Optional[str]]:
     """
     Fetch Disqus embed page HTML.
+    Clicks "Load more" button until all comments are visible.
     
     Returns:
         (html, None) if success
@@ -85,10 +87,44 @@ def fetch_disqus_comments(disqus_url: str) -> Tuple[Optional[str], Optional[str]
                 browser.close()
                 return None, "scrape_failed"
             
+            # Wait for initial comments to load
+            try:
+                page.wait_for_selector("ul#post-list", timeout=10000)
+            except PlaywrightTimeout: 
+                # No comments found or post-list didn't load
+                logger.warning("No comments found (post-list didn't load)")
+                browser.close()
+                return page.content(), None 
+            
+            # Click "Load more" button until it disappears
+            initial_count = len(page.locator('li.post').all())
+            max_clicks = 20  
+            clicks = 0
+            while clicks < max_clicks:
+                try:
+                    load_more = page.locator('a[data-action="more-posts"]')
+                    if not load_more.is_visible(timeout=2000):
+                        break
+                    load_more.click()
+
+                    # Wait for new comments to load (by checking if post count increases)
+                    clicks += 1
+                    new_count = len(page.locator('li.post').all())
+                    if new_count == initial_count:
+                        break
+                    initial_count = new_count
+                    time.sleep(1)
+                except Exception:
+                    break
+            
+            if clicks >= max_clicks:
+                logger.warning(f"WARNING: Reached max clicks ({max_clicks})!!")
+
+            # Get final HTML with all comments loaded
             html = page.content()
             browser.close()
             
-            logger.info(f"Successfully fetched Disqus comments from {disqus_url}")
+            logger.info(f"Successfully fetched Disqus comments from {disqus_url} (in {clicks + 1} batches)")
             return html, None
     except Exception as e:
         logger.error(f"Error fetching Disqus URL {disqus_url}: {e}")
@@ -97,7 +133,7 @@ def fetch_disqus_comments(disqus_url: str) -> Tuple[Optional[str], Optional[str]
 
 def parse_comments(html: str) -> List[Dict[str, any]]:
     """
-    Parse comments from Disqus HTML. No data cleaning is done here, just raw extraction.
+    Parse comments from Disqus HTML. 
     
     Returns:
         List of dicts: [{"text": "...", "posted_date": "...", "upvotes": 0}, ...]
@@ -124,21 +160,28 @@ def parse_comments(html: str) -> List[Dict[str, any]]:
         # Extract date
         date_element = post.find("a", class_="time-ago")
         if date_element and date_element.get("title"):
-            comment["posted_date"] = date_element["title"]
+            date_string = date_element["title"]
+            try: 
+                comment["posted_date"] = datetime.strptime(date_string, "%A, %B %d, %Y %I:%M %p")
+            except ValueError:
+                comment["posted_date"] = None
         else:
             comment["posted_date"] = None
 
         # Extract author
-        author_element = post.find("span", class_="author")
+        author_element = post.find("span", class_="author").find("a")
         if author_element:
-            comment["author"] = author_element.find("a").get_text(strip=True)
+            comment["author"] = author_element.get_text(strip=True)
         else:
             comment["author"] = "Anonymous" # Disqus allows anonymous comments
         
         # Extract upvotes
         upvote_element = post.find("div", class_="post-votes")
         if upvote_element:
-            comment["upvotes"] = upvote_element.find_all("span")[1].get_text(strip=True)
+            try: 
+                comment["upvotes"] = upvote_element.find_all("span")[1].get_text(strip=True)
+            except (IndexError, ValueError, AttributeError):
+                comment["upvotes"] = 0
         else:
             comment["upvotes"] = 0
 
@@ -200,3 +243,43 @@ def scrape_module_reviews(module_code: str, retry_count: int = 3) -> Tuple[List[
         return comments, None
     
     return [], "scrape_failed"
+
+def get_comment_count(module_code: str) -> Tuple[Optional[int], Optional[str]]:
+    """
+    Get total number of comments for a module without scraping them all.
+    
+    Returns:
+        (count, None) if success
+        (None, error_code) if failed
+    """
+    try:
+        html, error = fetch_module_page(module_code)
+        
+        if error:
+            return None, error
+        
+        disqus_url = extract_disqus_url(html, module_code)
+        if not disqus_url:
+            return None, "scrape_failed"
+        
+        with sync_playwright() as p:
+            browser = p.chromium.launch(headless=True)
+            page = browser.new_page()
+            page.goto(disqus_url, wait_until="networkidle", timeout=15000)
+            
+            try:
+                count_element = page.locator('span.comment-count').first
+                count_text = count_element.inner_text(timeout=5000)
+                count = int(count_text.split()[0])
+                browser.close()
+                logger.info(f"{module_code} has {count} comments")
+                return count, None
+                
+            except Exception as e:
+                logger.warning(f"Could not get comment count for {module_code}: {e}")
+                browser.close()
+                return 0, None  # Assume 0 if can't find count
+                
+    except Exception as e:
+        logger.error(f"Error getting comment count for {module_code}: {e}")
+        return None, "scrape_failed"
