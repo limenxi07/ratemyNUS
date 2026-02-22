@@ -15,16 +15,16 @@ class Module(Base):
     id = Column(Integer, primary_key=True, index=True)
     code = Column(String(20), unique=True, index=True, nullable=False)
     name = Column(String(200), index=True, nullable=False)
-    units = Column(Integer)
     description = Column(Text)
     url = Column(String(500))
-    is_su_option = Column(Boolean, default=False)
     semesters_available = Column(JSON)  # ["Sem 1", "Sem 2", "ST1", "ST2"]
+    units = Column(Integer)
+    last_comment_count = Column(Integer, default=0)
+    has_sufficient_reviews = Column(Boolean)
     
     # Aggregated sentiment analysis results
     sentiment_data = Column(JSON)  # {workload: 4.2, difficulty: 3.8, summary: "...", advice: "..."}
     last_analyzed = Column(DateTime)
-    last_comment_count = Column(Integer, default=0)
     
     # Timestamps
     created_at = Column(DateTime, default=now_sgt)
