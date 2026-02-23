@@ -1,24 +1,35 @@
-'use client'
-
-import { useState } from 'react'
-
-const API_URL = "http://localhost:8000/"
+import SearchBar from '@/components/SearchBar';
+import Link from 'next/link';
 
 export default function Home() {
-  const [message, setMessage] = useState('')
-  
-  const testAPI = async () => {
-    let data = await fetch(API_URL)
-    let response = await data.json()
-    setMessage(response.message)
-  }
-
-  // homepage HTML
   return (
-    <div>
-      <h1> ratemyNUS </h1>
-      <p> Lorum ipsum </p>
-      <button onClick={testAPI}> Test API </button>{message && <p>API Response: {message}</p>}
-    </div>
+    <main className="min-h-screen">
+      <div className="max-w-4xl mx-auto px-6 py-20">
+        {/* Hero Section */}
+        <div className="text-center mb-12">
+          <h1 className="font-serif font-bold text-6xl text-off-black mb-4">
+            ratemyNUS
+          </h1>
+          <p className="text-xl text-off-black/70 font-medium">
+            Aggregated 2-minute NUSMods reviews
+          </p>
+        </div>
+
+        {/* Search Bar */}
+        <div className="mb-8">
+          <SearchBar size="large" />
+        </div>
+
+        {/* Browse Link */}
+        <div className="text-center">
+          <Link 
+            href="/modules" 
+            className="inline-block text-tan font-semibold hover:underline text-lg"
+          >
+            Browse all modules →
+          </Link>
+        </div>
+      </div>
+    </main>
   );
 }
