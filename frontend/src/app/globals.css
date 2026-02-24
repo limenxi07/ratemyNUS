@@ -2,6 +2,8 @@
 @import '@fontsource/inter/400.css';
 @import '@fontsource/inter/500.css';
 @import '@fontsource/inter/600.css';
+@import url('https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Libre+Caslon+Display&family=PT+Serif:ital,wght@0,400;0,700;1,400;1,700&display=swap');
 
 @tailwind base;
 @tailwind components;
@@ -9,6 +11,6 @@
 
 @layer base {
   body {
-    @apply bg-off-white text-off-black font-sans;
+    @apply bg-background text-text-body font-sans;
   }
 }

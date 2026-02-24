@@ -10,7 +10,7 @@ export default async function ModulesPage() {
   return (
     <main className="min-h-screen">
       <div className="max-w-6xl mx-auto px-6 py-12">
-        <h1 className="font-serif font-bold text-4xl text-off-black mb-8">
+        <h1 className="font-serif font-bold text-4xl text-text-body mb-8">
           Browse All Modules
         </h1>
 
@@ -19,16 +19,16 @@ export default async function ModulesPage() {
             <a
               key={module.code}
               href={`/modules/${module.code}`}
-              className="block bg-white border-2 border-sage rounded-2xl p-6 hover:border-tan hover:shadow-lg transition"
+              className="block bg-surface border-2 border-outline-primary rounded-2xl p-6 hover:border-outline-active hover:shadow-lg transition"
             >
-              <div className="font-bold text-xl text-off-black mb-2">
+              <div className="font-semibold text-2xl font-serif mb-2">
                 {module.code}
               </div>
-              <div className="text-sm text-off-black/70 mb-4 line-clamp-2">
+              <div className="text-text-body/70 italic mb-4 line-clamp-2">
                 {module.name}
               </div>
-              <div className="text-xs text-off-black/50">
-                {module.comment_count} reviews • {module.units} MCs
+              <div className="text-sm text-text-body/50">
+                {module.comment_count} reviews
               </div>
             </a>
           ))}

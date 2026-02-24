@@ -19,7 +19,6 @@ export default function SearchBar({ size = 'large' }: { size?: 'large' | 'small'
   const router = useRouter();
   const dropdownRef = useRef<HTMLDivElement>(null);
 
-  // Search as user types
   useEffect(() => {
     if (query.trim().length < 2) {
       setResults([]);
@@ -43,7 +42,6 @@ export default function SearchBar({ size = 'large' }: { size?: 'large' | 'small'
     return () => clearTimeout(debounce);
   }, [query]);
 
-  // Handle keyboard navigation
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (!showDropdown || results.length === 0) return;
 
@@ -69,7 +67,6 @@ export default function SearchBar({ size = 'large' }: { size?: 'large' | 'small'
     setQuery('');
   };
 
-  // Close dropdown when clicking outside
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
       if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
@@ -93,22 +90,22 @@ export default function SearchBar({ size = 'large' }: { size?: 'large' | 'small'
         onChange={(e) => setQuery(e.target.value)}
         onKeyDown={handleKeyDown}
         placeholder="Search by module code or name..."
-        className={`w-full ${inputSize} rounded-2xl border-2 border-sage focus:border-tan focus:outline-none bg-white transition`}
+        className={`w-full ${inputSize} rounded-2xl border-2 border-outline-primary focus:border-outline-active focus:outline-none bg-surface transition`}
       />
 
       {showDropdown && results.length > 0 && (
-        <div className="absolute top-full mt-2 w-full bg-white border-2 border-sage rounded-xl shadow-lg max-h-96 overflow-y-auto z-50">
+        <div className="absolute top-full mt-2 w-full bg-surface border-2 border-outline-primary rounded-xl shadow-lg max-h-96 overflow-y-auto z-50">
           {results.map((module, index) => (
             <button
               key={module.code}
               onClick={() => handleSelect(module.code)}
-              className={`w-full text-left px-5 py-3 hover:bg-cream transition ${
-                index === selectedIndex ? 'bg-sage-light' : ''
-              } ${index !== results.length - 1 ? 'border-b border-sage/20' : ''} first:rounded-t-xl last:rounded-b-xl`}
+              className={`w-full text-left px-5 py-3 hover:bg-navbar transition ${
+                index === selectedIndex ? 'bg-outline-primary' : ''
+              } ${index !== results.length - 1 ? 'border-b border-outline-primary/20' : ''} first:rounded-t-xl last:rounded-b-xl`}
             >
-              <div className="font-semibold text-off-black">{module.code}</div>
-              <div className="text-sm text-off-black/70">{module.name}</div>
-              <div className="text-xs text-off-black/50 mt-1">
+              <div className="font-semibold text-text-body">{module.code}</div>
+              <div className="text-sm text-text-body/70">{module.name}</div>
+              <div className="text-xs text-text-body/50 mt-1">
                 {module.comment_count} reviews • {module.units} MCs • Sem {module.semesters.join(', ')}
               </div>
             </button>
