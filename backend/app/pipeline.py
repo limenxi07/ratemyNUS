@@ -5,6 +5,7 @@ from app.database import SessionLocal
 from app.models import Module, Comment
 from app.scraper import scrape_module_reviews
 from typing import Dict, List, Optional
+from app.sentiment import analyze_module_sentiment
 import logging
 
 logging.basicConfig(level=logging.INFO)
@@ -166,6 +167,10 @@ def process_module(module_code: str, db: Session) -> bool:
         # Step 4: Replace comments
         replace_module_comments(db, module.id, comments)
         update_module_comment_count(db, module.id, len(comments))
+
+        # Step 5: Run sentiment analysis
+        logger.info(f"Running sentiment analysis for {module_code}...")
+        analyze_module_sentiment(db, module.id)
         
         logger.info(f"✅ {module_code} complete ({len(comments)} comments)")
         return True
