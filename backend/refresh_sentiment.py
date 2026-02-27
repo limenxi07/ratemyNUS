@@ -1,5 +1,6 @@
 from app.database import SessionLocal
 from app.models import Module
+from app.sentiment import analyze_all_modules
 import logging
 
 logging.basicConfig(level=logging.INFO)
@@ -24,10 +25,23 @@ def clear_sentiment_data():
     
     logger.info(f"✅ Cleared sentiment data from {len(modules)} modules")
 
+def run_sentiment_analysis():
+    logger.info("Starting sentiment analysis for all modules...")
+    
+    db = SessionLocal()
+    results = analyze_all_modules(db)
+    db.close()
+    
+    logger.info(f"\n{'='*60}\nSENTIMENT ANALYSIS COMPLETE\n{'='*60}")
+    logger.info(f"✅ Success: {results['success']}")
+    logger.info(f"⚠️  Insufficient data (≤3 reviews): {results['insufficient_data']}")
+    logger.info(f"❌ Failed: {results['failed']}")
+    logger.info(f"{'='*60}\n")
+
 if __name__ == "__main__":
-    confirm = input("Clear all sentiment data? (yes/no): ")
+    confirm = input("Clear and regenerate all sentiment data? (yes/no): ")
     if confirm.lower() == 'yes':
         clear_sentiment_data()
-        logger.info("You can now re-run: python run_sentiment_analysis.py")
+        run_sentiment_analysis()
     else:
         logger.info("Aborted.")

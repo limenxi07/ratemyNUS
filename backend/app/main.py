@@ -47,6 +47,8 @@ def get_all_modules():
             "name": m.name,
             "comment_count": m.last_comment_count,
             "units": m.units,
+            "semesters": m.semesters_available,
+            "sentiment_data": m.sentiment_data,
         }
         for m in modules
     ]

@@ -1,11 +1,14 @@
 import httpx
+import sys
+from pathlib import Path
 from sqlalchemy.orm import Session
 from sqlalchemy.dialects.postgresql import insert
+sys.path.insert(0, str(Path(__file__).parent.parent))
 from app.database import SessionLocal
 from app.models import Module, Comment
 from app.scraper import scrape_module_reviews
-from typing import Dict, List, Optional
 from app.sentiment import analyze_module_sentiment
+from typing import Dict, List, Optional
 import logging
 
 logging.basicConfig(level=logging.INFO)
@@ -39,7 +42,14 @@ def fetch_module_metadata(module_code: str) -> Optional[Dict]:
             return None
         
         data = response.json()
-        semesters = [str(s["semester"]) for s in data.get("semesterData", []) if "semester" in s]
+        semesters = []
+        for s in data.get("semesterData", []):
+            if (s.get("semester") == 3):
+                semesters.append("ST1")
+            elif (s.get("semester") == 4):
+                semesters.append("ST2")
+            else:
+                semesters.append(str(s.get("semester", "Unknown")))
         metadata = {
             "code": data.get("moduleCode"),
             "name": data.get("title"),

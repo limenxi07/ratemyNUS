@@ -7,8 +7,9 @@ async function getModule(code: string) {
   return res.json();
 }
 
-export default async function ModulePage({ params }: { params: { code: string } }) {
-  const module = await getModule(params.code);
+export default async function ModulePage({ params }: { params: Promise<{ code: string }>  }) {
+  const { code } = await params; 
+  const module = await getModule(code);
 
   if (!module) {
     return (
@@ -19,7 +20,7 @@ export default async function ModulePage({ params }: { params: { code: string } 
               Module not found
             </h2>
             <p className="text-text-body/70">
-              The module code &quot;{params.code}&quot; does not exist in our database.
+              The module code &quot;{code}&quot; does not exist in our database.
             </p>
           </div>
         </div>
@@ -32,49 +33,58 @@ export default async function ModulePage({ params }: { params: { code: string } 
       <div className="max-w-4xl mx-auto px-6 py-12">
         {/* Module Header */}
         <div className="bg-surface border-2 border-outline-primary rounded-2xl p-8 mb-6">
-          <div className="font-serif font-bold text-4xl text-text-body mb-2">
+          <div className="font-serif font-bold text-5xl text-text-body mb-2">
             {module.code}
           </div>
-          <div className="text-xl text-text-body/80 mb-6">
+          <div className="text-xl text-text-body/80 mb-4">
             {module.name}
           </div>
 
           {/* Quick Facts */}
           <div className="flex flex-wrap gap-4 text-sm">
-            <div className="bg-navbar px-4 py-2 rounded-xl border border-outline-primary">
+            {module.sentiment_data && !module.sentiment_data.insufficient_data && module.sentiment_data.average && (
+              // conditional rendering of average (with color coding) 
+              <>
+              {module.sentiment_data.average >= 4.0 ? (
+                <div className="px-4 py-2 rounded-xl border-2 font-semibold bg-green/60 text-dark-green border-green">
+                  {module.sentiment_data.average.toFixed(1)}/5.0
+                </div>
+              ) : module.sentiment_data.average >= 3.0 ? (
+                <div className="px-4 py-2 rounded-xl border-2 font-semibold bg-yellow/60 text-dark-yellow border-yellow">
+                  {module.sentiment_data.average.toFixed(1)}/5.0
+                </div>
+              ) : (
+                <div className="px-4 py-2 rounded-xl border-2 font-semibold bg-peach/60 text-dark-peach border-peach">
+                  {module.sentiment_data.average.toFixed(1)}/5.0
+                </div>
+              )}
+            </>
+            )}
+            <div className="bg-navbar px-4 py-2 rounded-xl border-2 border-outline-primary">
               <span className="font-semibold text-text-primary">{module.units}</span> MCs
             </div>
-            <div className="bg-navbar px-4 py-2 rounded-xl border border-outline-primary">
+            <div className="bg-navbar px-4 py-2 rounded-xl border-2 border-outline-primary">
               Sem <span className="font-semibold text-text-primary">{module.semesters.join(', ')}</span>
             </div>
-            <div className="bg-navbar px-4 py-2 rounded-xl border border-outline-primary">
+            <div className="bg-navbar px-4 py-2 rounded-xl border-2 border-outline-primary">
               <span className="font-semibold text-text-primary">{module.comment_count}</span> reviews
+            </div>
+            <div className="bg-navbar px-4 py-2 rounded-xl border-2 border-outline-primary">
+              <a className="font-semibold text-text-primary hover:underline" href={module.url} target="_blank" rel="noopener noreferrer">View on NUSMods →</a> 
             </div>
           </div>
 
-          {/* Description */}
+          {/* Description // TODO: removed for now because it was too useless
           {module.description && (
             <div className="mt-6 pt-6 border-t-2 border-outline-primary/20">
-              <h3 className="font-semibold text-text-body mb-2">Description</h3>
               <p className="text-text-body/70 leading-relaxed">
                 {module.description}
               </p>
             </div>
-          )}
+          )}*/
+          }
+          
 
-          {/* NUSMods Link */}
-          {module.url && (
-            <div className="mt-6">
-              <a
-                href={module.url}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="inline-block text-text-primary font-semibold hover:underline"
-              >
-                View on NUSMods →
-              </a>
-            </div>
-          )}
         </div>
 
         {/* Sentiment Analysis or Insufficient Data */}
@@ -88,13 +98,10 @@ export default async function ModulePage({ params }: { params: { code: string } 
             <SentimentDisplay data={module.sentiment_data} />
           )
         ) : (
-          <div className="bg-navbar/50 border-2 border-outline-primary rounded-2xl p-8 text-center">
-            <div className="text-text-body/60 mb-2">
-              📊 Sentiment analysis not yet available
+          <div className="bg-surface border-2 border-outline-primary rounded-2xl p-8 text-center">
+            <div className="text-text-body/60 italic">
+              Sentiment analysis is not yet available. Please check back next time!
             </div>
-            <p className="text-sm text-text-body/50">
-              Run sentiment analysis to see aggregated insights
-            </p>
           </div>
         )}
       </div>

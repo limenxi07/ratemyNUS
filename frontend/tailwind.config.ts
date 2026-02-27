@@ -18,6 +18,11 @@ const config: Config = {
         'text-body': '#2B2D2F',
         'surface': '#FDFCF8',
         'peach': '#F7B4B4', // error colour
+        'yellow': '#F7E3B4', // warning colour
+        'green': '#ACD6AC', // success colour
+        'dark-peach': '#E93535',
+        'dark-yellow': '#E9B335',
+        'dark-green': '#51A451',
       },
       fontFamily: {
         serif: ['Instrument Serif', 'Lora', 'Georgia', 'serif'],
