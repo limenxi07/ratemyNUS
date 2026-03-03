@@ -6,3 +6,4 @@ __pycache__/
 .vscode/
 .vercel
 .env*.local
+.env.production
