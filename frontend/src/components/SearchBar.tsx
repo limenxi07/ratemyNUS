@@ -28,7 +28,7 @@ export default function SearchBar({ size = 'large' }: { size?: 'large' | 'small'
 
     const searchModules = async () => {
       try {
-        const res = await fetch(`http://localhost:8000/api/search?q=${encodeURIComponent(query)}`);
+        const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/search?q=${encodeURIComponent(query)}`);
         const data = await res.json();
         setResults(data);
         setShowDropdown(data.length > 0);

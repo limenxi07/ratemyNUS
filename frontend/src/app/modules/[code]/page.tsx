@@ -2,7 +2,7 @@ import SentimentDisplay from '@/components/SentimentDisplay';
 import InsufficientReviews from '@/components/InsufficientReviews';
 
 async function getModule(code: string) {
-  const res = await fetch(`http://localhost:8000/api/modules/${code}`, { cache: 'no-store' });
+  const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/modules/${code}`, { cache: 'no-store' });
   if (!res.ok) return null;
   return res.json();
 }
