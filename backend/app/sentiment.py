@@ -83,7 +83,7 @@ Return ONLY valid JSON (no markdown, no preamble) with this structure:
     "recitation": "<similar to above (only if mentioned)>"
   }},
   "top_comment": {{
-      "text": <text, formatted nicely with appropriate line breaks added using the <br> tag>,
+      "text": <Reformat the comment text with proper line breaks. Add \\n between sentences or major points to improve readability. Keep the exact meaning but make it easier to read.>,
       "upvotes": <number>,
       "date": "<ISO date>",
       "author": "<if mentioned, otherwise null>"

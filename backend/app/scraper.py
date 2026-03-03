@@ -7,6 +7,7 @@ import time
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
+MAX_FAILURES = 3
 
 
 def fetch_module_page(module_code: str) -> Tuple[Optional[str], Optional[str]]:
@@ -98,22 +99,28 @@ def fetch_disqus_comments(disqus_url: str) -> Tuple[Optional[str], Optional[str]
             
             # Click "Load more" button until it disappears
             initial_count = len(page.locator('li.post').all())
-            max_clicks = 20  
             clicks = 0
+            max_clicks = 200 
+            failures = 0
             while clicks < max_clicks:
                 try:
                     load_more = page.locator('a[data-action="more-posts"]')
-                    if not load_more.is_visible(timeout=2000):
+                    if not load_more.is_visible(timeout=4000):
                         break
+                    before_count = len(page.locator('li.post').all())
                     load_more.click()
-
-                    # Wait for new comments to load (by checking if post count increases)
                     clicks += 1
-                    new_count = len(page.locator('li.post').all())
-                    if new_count == initial_count:
-                        break
-                    initial_count = new_count
-                    time.sleep(1)
+
+                    # Wait for new comments to load
+                    time.sleep(3)
+                    after_count = len(page.locator('li.post').all())
+                    if after_count == before_count:
+                        failures += 1
+                        if failures >= MAX_FAILURES:
+                            logger.warning(f"Stopping after {failures} attempts failed to load new comments")
+                            break
+                    else:
+                        failures = 0
                 except Exception:
                     break
             

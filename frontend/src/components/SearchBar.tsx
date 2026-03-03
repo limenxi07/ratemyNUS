@@ -93,23 +93,27 @@ export default function SearchBar({ size = 'large' }: { size?: 'large' | 'small'
         className={`w-full ${inputSize} rounded-2xl border-2 border-outline-primary focus:border-outline-active focus:outline-none bg-surface transition`}
       />
 
-      {showDropdown && results.length > 0 && (
+      {showDropdown && (
         <div className="absolute top-full mt-2 w-full bg-surface border-2 border-outline-primary rounded-xl shadow-lg max-h-96 overflow-y-auto z-50">
-          {results.map((module, index) => (
-            <button
-              key={module.code}
-              onClick={() => handleSelect(module.code)}
-              className={`w-full text-left px-5 py-3 hover:bg-navbar transition ${
-                index === selectedIndex ? 'bg-outline-primary' : ''
-              } ${index !== results.length - 1 ? 'border-b border-outline-primary/20' : ''} first:rounded-t-xl last:rounded-b-xl`}
-            >
-              <div className="font-semibold text-text-body">{module.code}</div>
-              <div className="text-sm text-text-body/70">{module.name}</div>
-              <div className="text-xs text-text-body/50 mt-1">
-                {module.comment_count} reviews • {module.units} MCs • Sem {module.semesters.join(', ')}
-              </div>
-            </button>
-          ))}
+          {results.length > 0 ? (
+            results.map((module, index) => (
+              <button
+                key={module.code}
+                onClick={() => handleSelect(module.code)}
+                className={`w-full text-left px-5 py-3 hover:bg-navbar transition ${
+                  index === selectedIndex ? 'bg-outline-primary' : ''
+                } ${index !== results.length - 1 ? 'border-b border-outline-primary/20' : ''} first:rounded-t-xl last:rounded-b-xl`}
+              >
+                <div className="font-semibold text-text-body">{module.code}</div>
+                <div className="text-sm text-text-body/70">{module.name}</div>
+                <div className="text-xs text-text-body/50 mt-1">
+                  {module.comment_count} reviews • {module.units} MCs • Sem {module.semesters.join(', ')}
+                </div>
+              </button>
+            ))
+          ) : (
+            <div className="px-5 py-4 text-center text-text-body/60">No module found</div>
+          )}
         </div>
       )}
     </div>

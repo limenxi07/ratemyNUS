@@ -6,6 +6,8 @@ async function getModules() {
 
 export default async function ModulesPage() {
   const modules = await getModules();
+  // Sort modules alphabetically by code
+  const sortedModules = [...modules].sort((a, b) => a.code.localeCompare(b.code));
 
   return (
     <main className="min-h-screen">
@@ -15,7 +17,7 @@ export default async function ModulesPage() {
         </h1>
 
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {modules.map((module: any) => (
+          {sortedModules.map((module: any) => (
             <a
               key={module.code}
               href={`/modules/${module.code}`}
