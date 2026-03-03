@@ -6,7 +6,7 @@ from sqlalchemy.dialects.postgresql import insert
 sys.path.insert(0, str(Path(__file__).parent.parent))
 from app.database import SessionLocal
 from app.models import Module, Comment
-from app.scraper import scrape_module_reviews
+from app.scraper import scrape_module_reviews, get_comment_count
 from app.sentiment import analyze_module_sentiment
 from typing import Dict, List, Optional
 import logging
@@ -143,6 +143,7 @@ def update_module_comment_count(db: Session, module_id: int, count: int):
 def process_module(module_code: str, db: Session) -> bool:
     """
     Complete pipeline for one module.
+    Only re-scrapes and re-analyses if comment count has changed since last analysis.
     Returns True if success, False if failed.
     """
     logger.info(f"\n{'='*60}\nProcessing {module_code}\n{'='*60}")
@@ -157,7 +158,17 @@ def process_module(module_code: str, db: Session) -> bool:
         # Step 2: Upsert module
         module = upsert_module(db, metadata)
         
-        # Step 3: Scrape comments
+        # Step 3: Check for change in comment count
+        current_count, error = get_comment_count(module_code)
+        if error:
+            logger.error(f"Failed to get comment count for {module_code}")
+            return False
+        elif current_count == module.last_comment_count and module.sentiment_data:
+            logger.info(f"✅ {module_code} unchanged ({current_count} comments), skipping")
+            return True
+
+        # Step 4: Scrape comments (only if changed)
+        logger.info(f"📊 {module_code} has changed: {module.last_comment_count} → {current_count} comments")
         comments, error = scrape_module_reviews(module_code)
         
         if error == "not_found":
@@ -174,11 +185,11 @@ def process_module(module_code: str, db: Session) -> bool:
             update_module_comment_count(db, module.id, 0)
             return True
         
-        # Step 4: Replace comments
+        # Step 5: Replace comments
         replace_module_comments(db, module.id, comments)
         update_module_comment_count(db, module.id, len(comments))
 
-        # Step 5: Run sentiment analysis
+        # Step 6: Run sentiment analysis
         logger.info(f"Running sentiment analysis for {module_code}...")
         analyze_module_sentiment(db, module.id)
         

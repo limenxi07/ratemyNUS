@@ -6,5 +6,5 @@ python-dotenv
 httpx
 playwright
 pydantic
-google-genai
 bs4
+groq

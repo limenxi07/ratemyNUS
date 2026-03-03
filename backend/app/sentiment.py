@@ -18,7 +18,6 @@ MAX_TOKENS = 5000
 
 client = genai.Client(api_key=os.getenv("GEMINI_API_KEY"))
 
-
 def analyze_module_sentiment(db: Session, module_id: int) -> bool:
     """
     Analyze sentiment for a module using Gemini API.
@@ -72,7 +71,7 @@ Return ONLY valid JSON (no markdown, no preamble) with this structure:
   "difficulty": <float 1-5, where 1=very easy, 5=very hard>,
   "usefulness": <float 1-5, where 1=not useful, 5=extremely useful>,
   "enjoyability": <float 1-5, where 1=not enjoyable, 5=very enjoyable>,
-  "summary": "<one concise sentence capturing overall student sentiment>",
+  "summary": "<a concise synthesis of overall sentiment, around 100 words>",
   "reasoning": "<a brief explanation of how you arrived at the scores, mentioning key themes from the reviews. each score should have its own concise one-sentence justification>",
   "advice": {{
     "general": "<synthesise general advice for future students, only if mentioned in reviews>",
@@ -83,25 +82,22 @@ Return ONLY valid JSON (no markdown, no preamble) with this structure:
     "tutorial": "<similar to above (only if mentioned)>",
     "recitation": "<similar to above (only if mentioned)>"
   }},
-  "top_comments": [
-    {{
+  "top_comment": {{
+      "text": <text, formatted nicely with appropriate line breaks added using the <br> tag>,
       "upvotes": <number>,
       "date": "<ISO date>",
       "author": "<if mentioned, otherwise null>"
     }},
-    (select 3 most helpful/representative comments, without including full text)
-  ]
 }}
 
 RULES:
 - Scores should reflect the AVERAGE sentiment, not extremes
 - Scores should be in whole numbers where possible, but can be in decimals (strictly 0.5 increments) to more accurately represent small differences between modules
 - Advice sections: only include if students actually mention that exam type
-- Summary should be a concise synthesis of overall sentiment, not just a generic statement. It should be one paragraph, maximum 100 words.
+- Summary should be a concise synthesis of overall sentiment, not just a generic statement. It should be one paragraph, around 100 words.
 - Advice should synthesise common themes across reviews, not just copy-paste individual comments. For example, if multiple students mention that the midterm is very difficult and covers obscure topics, the midterm advice could be: "The midterm is challenging, with questions that cover difficult topics such as [...] (fill this in). It's recommended to review lecture materials thoroughly and practice with past year papers to identify these tricky areas."
-- Advice should be presented in a way that future students can easily understand and act on, rather than just being a collection of quotes. It should provide actionable insights. Each advice section should be 1-3 sentences summarising the key points from the reviews. No more than 50 words per advice section.
-- Top comments: choose diverse perspectives (not all positive or all negative), and ensure they are representative of the overall sentiment. If no clear "most helpful" comments, just select a few that capture common themes.
-- Top comments should only be posted in the last 3 years to ensure relevance. If there are more recent comments claiming a change in module structure/content, prioritize those instead.
+- Advice should be presented in a way that future students can easily understand and act on, rather than just being a collection of quotes. It should provide actionable insights. Each advice section should be 3 sentences summarising the key points from the reviews, approximately 50 words.
+- Top comment: Select a singular comment that gives comprehensive advice. Choose one comment that is posted in the last 3 years to ensure relevance. If there are more recent comments claiming a change in module structure/content, prioritize those instead.
 - Return ONLY the JSON object, nothing else"""
 
     try:
@@ -147,33 +143,6 @@ RULES:
         # round up the average score to the nearest 0.5 increment
         average_score = round(average_score * 2) / 2
         sentiment_data["average"] = average_score
-        
-        # Update JSON data with full text for top comments
-        # Retrieve full text from comment database
-        top_comments = []
-        for ref in sentiment_data.get("top_comments", []):
-            # Find matching comment by upvotes, date, and author
-            for c in comments:
-                date_match = (
-                    c.posted_date and 
-                    ref.get("date") and 
-                    c.posted_date.isoformat() == ref["date"]
-                )
-                upvote_match = c.upvotes == ref.get("upvotes", -1)
-                author_match = getattr(c, 'author', 'Anonymous') == ref.get("author", "")
-                
-                # Match if at least 2 out of 3 criteria match (in case of slight discrepancies)
-                matches = sum([date_match, upvote_match, author_match])
-                
-                if matches >= 2:
-                    top_comments.append({
-                        "text": c.text,
-                        "upvotes": c.upvotes,
-                        "date": c.posted_date.isoformat() if c.posted_date else None,
-                        "author": getattr(c, 'author', 'Anonymous')
-                    })
-                    break  # Found match, move to next reference
-        sentiment_data["top_comments"] = top_comments
         
         # Store in database
         module.sentiment_data = sentiment_data

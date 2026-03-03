@@ -15,12 +15,12 @@ interface SentimentData {
     tutorial?: string;
     recitation?: string;
   };
-  top_comments: Array<{
+  top_comment: {
     text: string;
     upvotes: number;
     date: string;
     author?: string;
-  }>;
+  };
 }
 
 interface Props {
@@ -117,30 +117,25 @@ export default function SentimentDisplay({ data }: Props) {
         )}
       </div>
 
-      {/* Top Comments */}
-        {data.top_comments && data.top_comments[0].text != undefined && (
+      {/* Top Comment */}
+        {data.top_comment && (
           <div className="bg-surface border-2 border-outline-primary rounded-2xl p-8">
           <div>
             <h3 className="font-serif font-bold text-4xl text-text-body mb-2 pb-6 text-center">
-              Top Reviews
+              Top Comment
             </h3>
             
             <div className="space-y-4">
-              {data.top_comments.map((comment, index) => (
-                <div
-                  key={index}
-                  className="bg-navbar/50 rounded-xl p-4"
-                >
+                <div className="bg-navbar/50 rounded-xl p-4">
                   <p className="text-text-body/80 leading-relaxed mb-3">
-                    &quot;{comment.text}&quot;
+                    &quot;{data.top_comment.text}&quot;
                   </p>
                   <div className="flex items-center gap-4 text-sm text-text-body/60">
-                    <span>{new Date(comment.date).toLocaleDateString('en-SG', { year: 'numeric', month: 'short' })}</span>
+                    <span>Posted {new Date(data.top_comment.date).toLocaleDateString('en-SG', { year: 'numeric', month: 'short' })}</span>
                     <span>•</span>
-                    <span>{comment.upvotes} ⬆️</span>
+                    <span>{data.top_comment.upvotes} ⬆️</span>
                   </div>
                 </div>
-              ))}
             </div>
           </div>
         </div>

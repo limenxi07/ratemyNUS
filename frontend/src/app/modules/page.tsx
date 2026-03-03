@@ -43,9 +43,9 @@ export default async function ModulesPage() {
                         {module.sentiment_data.average.toFixed(1)}/5.0
                       </div>
                     )}
+                  <span className="text-text-body/30">•</span>
                   </>
                 )}
-                <span className="text-text-body/30">•</span>
                 <div className="text-text-body/50">
                   {module.comment_count} reviews
                 </div>
