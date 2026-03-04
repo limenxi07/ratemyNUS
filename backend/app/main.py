@@ -1,14 +1,18 @@
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.orm import Session
+from concurrent.futures import ThreadPoolExecutor
 from app.database import SessionLocal
 from app.models import Module, Comment
+from app.pipeline import main as run_pipeline
 from typing import List
+import asyncio
 import os
 import logging
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
+executor = ThreadPoolExecutor(max_workers=1)
 
 app = FastAPI(title="ratemyNUS API")
 
@@ -147,3 +151,64 @@ def search_modules(q: str):
         }
         for m in sorted_modules[:10]
     ]
+
+@app.get("/api/run-pipeline")
+async def trigger_pipeline():
+    """
+    Endpoint triggered by Vercel Cron.
+    Runs the scraping and analysis pipeline.
+    """
+    # Run pipeline in background to avoid timeout
+    loop = asyncio.get_event_loop()
+    
+    def run_in_thread():
+        try:
+            run_pipeline()
+            return {"status": "success", "message": "Pipeline completed"}
+        except Exception as e:
+            logger.error(f"Pipeline failed: {e}")
+            return {"status": "error", "message": str(e)}
+    
+    # Start pipeline but don't wait for completion (runs in background)
+    future = loop.run_in_executor(executor, run_in_thread)
+    
+    return {
+        "status": "started",
+        "message": "Pipeline started in background. Check logs for progress.",
+        "scheduled_time": "Daily at 3:00 AM SGT"
+    }
+
+@app.get("/api/pipeline-status")
+def pipeline_status():
+    """
+    Check which modules need attention.
+    For debugging and testing purposes.
+    """
+    db = SessionLocal()
+    
+    all_modules = db.query(Module).all()
+    
+    status = {
+        "needs_sentiment": [],
+        "needs_update": [],
+        "up_to_date": []
+    }
+    
+    for module in all_modules:
+        comment_count = db.query(Comment).filter(Comment.module_id == module.id).count()
+        
+        info = {
+            "code": module.code,
+            "comments": comment_count,
+            "has_sentiment": bool(module.sentiment_data)
+        }
+        
+        if comment_count > 0 and not module.sentiment_data:
+            status["needs_sentiment"].append(info)
+        elif comment_count != module.last_comment_count:
+            status["needs_update"].append(info)
+        else:
+            status["up_to_date"].append(info)
+    
+    db.close()
+    return status

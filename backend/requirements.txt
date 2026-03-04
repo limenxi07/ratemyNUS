@@ -8,4 +8,5 @@ httpx
 playwright
 pydantic
 bs4
-groq
+google-genai
+asyncio

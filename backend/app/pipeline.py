@@ -205,25 +205,54 @@ def process_module(module_code: str, db: Session) -> bool:
 def main():
     """Run the full pipeline for all modules."""
     db = SessionLocal()
+    all_modules = db.query(Module).all()
     
-    success_count = 0
-    failed_modules = []
+    # Separate into priority groups
+    needs_sentiment = []  # Has comments but no sentiment data
+    needs_update = []     # Comment count changed
+    up_to_date = []       # No change needed
     
-    for module_code in MODULE_CODES:
-        if process_module(module_code, db):
-            success_count += 1
+    for module in all_modules:
+        comment_count = db.query(Comment).filter(Comment.module_id == module.id).count()
+        
+        # Priority 1: Has comments but missing sentiment data
+        if comment_count > 0 and not module.sentiment_data:
+            needs_sentiment.append(module.code)
+        # Priority 2: Comment count changed
+        elif comment_count != module.last_comment_count:
+            needs_update.append(module.code)
+        # Priority 3: Up to date
         else:
-            failed_modules.append(module_code)
+            up_to_date.append(module.code)
     
+    # Process in priority order
+    processing_order = needs_sentiment + needs_update
+    results = {
+        "success": 0,
+        "failed": 0,
+        "skipped": 0
+    }
+    
+    # Process priority modules
+    for module_code in processing_order:
+        success = process_module(module_code, db)
+        if success:
+            results["success"] += 1
+        else:
+            results["failed"] += 1
+    
+    # Skip up-to-date modules
+    results["skipped"] = len(up_to_date)
     db.close()
     
     # Summary
-    logger.info(f"\n{'='*60}\nPIPELINE COMPLETE\n{'='*60}")
-    logger.info(f"✅ Success: {success_count}/{len(MODULE_CODES)}")
-    logger.info(f"❌ Failed: {len(failed_modules)}/{len(MODULE_CODES)}")
-    
-    if failed_modules:
-        logger.info(f"Failed modules: {', '.join(failed_modules)}")
+    logger.info(f"\n{'='*60}")
+    logger.info(f"PIPELINE COMPLETE")
+    logger.info(f"{'='*60}")
+    logger.info(f"✅ Processed successfully: {results['success']}")
+    logger.info(f"⏭️  Skipped (up to date): {results['skipped']}")
+    logger.info(f"❌ Failed: {results['failed']}")
+    logger.info(f"{'='*60}\n")
 
 
 if __name__ == "__main__":
