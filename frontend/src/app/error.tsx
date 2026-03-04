@@ -10,8 +10,8 @@ export default function Error({
   return (
     <div className="min-h-screen flex items-center justify-center">
       <div className="text-center">
-        <h2 className="font-serif font-bold text-2xl text-text-body mb-4">
-          Something went wrong!
+        <h2 className="font-serif font-bold text-5xl text-text-body mb-4">
+          Unexpected error
         </h2>
         <button
           onClick={() => reset()}
