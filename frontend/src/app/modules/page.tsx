@@ -1,5 +1,8 @@
 async function getModules() {
-  const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/modules`, { cache: 'no-store' });
+  const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/modules`, { 
+    cache: 'force-cache',
+    next: { revalidate: 3600 } // revalidate every hour
+  });
   if (!res.ok) throw new Error('Failed to fetch modules');
   return res.json();
 }
