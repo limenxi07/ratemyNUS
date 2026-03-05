@@ -4,7 +4,7 @@ from sqlalchemy.orm import Session
 from concurrent.futures import ThreadPoolExecutor
 from app.database import SessionLocal
 from app.models import Module, Comment
-from app.pipeline import main as run_pipeline
+from app.pipeline import main as run_pipeline, MODULE_CODES, process_module
 from typing import List
 import asyncio
 import os
@@ -212,3 +212,41 @@ def pipeline_status():
     
     db.close()
     return status
+
+@app.get("/api/populate-database")
+async def populate_database():
+    """
+    Manually trigger database population.
+    Run this ONCE after creating tables.
+    Takes 5-10 minutes.
+    """
+    import logging
+    logging.basicConfig(level=logging.INFO)
+    logger = logging.getLogger(__name__)
+    
+    db = SessionLocal()
+    results = {"success": [], "failed": [], "total": len(MODULE_CODES)}
+    
+    for module_code in MODULE_CODES:
+        try:
+            logger.info(f"Processing {module_code}...")
+            success = process_module(module_code, db)
+            
+            if success:
+                results["success"].append(module_code)
+                logger.info(f"✅ {module_code} complete")
+            else:
+                results["failed"].append(module_code)
+                logger.error(f"❌ {module_code} failed")
+        except Exception as e:
+            logger.error(f"Error with {module_code}: {e}")
+            results["failed"].append(module_code)
+    
+    db.close()
+    
+    return {
+        "status": "complete",
+        "processed": len(results["success"]) + len(results["failed"]),
+        "successful": results["success"],
+        "failed": results["failed"]
+    }
