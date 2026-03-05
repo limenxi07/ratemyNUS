@@ -1,11 +1,9 @@
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
-from sqlalchemy.orm import Session
 from concurrent.futures import ThreadPoolExecutor
 from app.database import SessionLocal
 from app.models import Module, Comment
 from app.pipeline import main as run_pipeline, MODULE_CODES, process_module
-from typing import List
 import asyncio
 import os
 import logging
@@ -220,33 +218,70 @@ async def populate_database():
     Run this ONCE after creating tables.
     Takes 5-10 minutes.
     """
-    import logging
-    logging.basicConfig(level=logging.INFO)
-    logger = logging.getLogger(__name__)
-    
-    db = SessionLocal()
-    results = {"success": [], "failed": [], "total": len(MODULE_CODES)}
-    
-    for module_code in MODULE_CODES:
-        try:
-            logger.info(f"Processing {module_code}...")
-            success = process_module(module_code, db)
-            
-            if success:
-                results["success"].append(module_code)
-                logger.info(f"✅ {module_code} complete")
-            else:
+    loop = asyncio.get_event_loop()
+
+    # Run in separate thread to allow sync Playwright
+    def run_population():
+        db = SessionLocal()
+        results = {"success": [], "failed": [], "errors": {}}
+        
+        for module_code in MODULE_CODES:
+            try:
+                logger.info(f"Processing {module_code}...")
+                success = process_module(module_code, db)
+                
+                if success:
+                    results["success"].append(module_code)
+                    logger.info(f"✅ {module_code}")
+                else:
+                    results["failed"].append(module_code)
+                    results["errors"][module_code] = "process_module returned False"
+            except Exception as e:
                 results["failed"].append(module_code)
-                logger.error(f"❌ {module_code} failed")
-        except Exception as e:
-            logger.error(f"Error with {module_code}: {e}")
-            results["failed"].append(module_code)
+                results["errors"][module_code] = str(e)
+                logger.error(f"❌ {module_code}: {e}")
+        
+        db.close()
+        return results
     
-    db.close()
+    # Run in thread pool
+    results = await loop.run_in_executor(executor, run_population)
     
     return {
         "status": "complete",
         "processed": len(results["success"]) + len(results["failed"]),
         "successful": results["success"],
-        "failed": results["failed"]
+        "failed": results["failed"],
+        "errors": results["errors"]
     }
+
+@app.get("/api/populate-chunk/{start}/{end}")
+async def populate_chunk(start: int, end: int):
+    """
+    Populate modules in chunks to avoid timeout.
+    Example: /api/populate-chunk/0/3
+    """
+    loop = asyncio.get_event_loop()
+    
+    def run_chunk():
+        db = SessionLocal()
+        chunk = MODULE_CODES[start:end]
+        results = {"success": [], "failed": [], "errors": {}, "chunk": f"{start}-{end}"}
+        
+        for module_code in chunk:
+            try:
+                success = process_module(module_code, db)
+                if success:
+                    results["success"].append(module_code)
+                else:
+                    results["failed"].append(module_code)
+                    results["errors"][module_code] = "Failed"
+            except Exception as e:
+                results["failed"].append(module_code)
+                results["errors"][module_code] = str(e)
+        
+        db.close()
+        return results
+    
+    results = await loop.run_in_executor(executor, run_chunk)
+    return results
