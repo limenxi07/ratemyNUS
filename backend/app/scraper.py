@@ -1,15 +1,9 @@
+from playwright.sync_api import sync_playwright, TimeoutError as PlaywrightTimeout
 from bs4 import BeautifulSoup
 from typing import Optional, Tuple, List, Dict
 from datetime import datetime
 import logging
-import os
-import requests
 import time
-from dotenv import load_dotenv
-
-load_dotenv()
-BROWSERLESS_API_KEY = os.getenv("BROWSERLESS_API_KEY")
-BROWSERLESS_URL = f"https://chrome.browserless.io/content?token={BROWSERLESS_API_KEY}"
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -28,45 +22,32 @@ def fetch_module_page(module_code: str) -> Tuple[Optional[str], Optional[str]]:
     url = f"https://nusmods.com/courses/{module_code}"
     
     try:
-        payload = {
-            "url": url,
-            "gotoOptions": {
-                "waitUntil": "networkidle2",
-                "timeout": 20000
-            },
-            "waitForSelector": {
-                "selector": "iframe#dsq-app, div#disqus_thread, div.container",
-                "timeout": 10000
-            }
-        }
-        
-        logger.info(f"Fetching {url} via Browserless...")
-        response = requests.post(BROWSERLESS_URL, json=payload, timeout=60)
-        
-        if response.status_code != 200:
-            logger.error(f"Browserless failed: {response.status_code}")
-            logger.error(f"Response: {response.text[:200]}")
-            return None, "scrape_failed"
-        
-        html = response.text
-        
-        # Check if JavaScript rendered
-        if "Please enable JavaScript" in html:
-            logger.error(f"JavaScript not executed properly")
-            return None, "scrape_failed"
-        
-        # Check if module exists
-        if "Module not found" in html or len(html) < 5000:
-            logger.warning(f"Module {module_code} not found")
-            return None, "not_found"
-        
-        logger.info(f"✅ Fetched {url} ({len(html)} bytes)")
-        
-        return html, None
-        
-    except requests.exceptions.Timeout:
-        logger.error(f"Browserless timeout for {module_code}")
-        return None, "scrape_failed"
+        with sync_playwright() as p:
+            browser = p.chromium.launch(headless=True)
+            page = browser.new_page()
+            
+            response = page.goto(url, wait_until="networkidle", timeout=15000)
+            
+            # Check if module exists (404 page)
+            if response.status == 404:
+                logger.warning(f"Module {module_code} not found (404)")
+                browser.close()
+                return None, "not_found"
+            
+            # Wait for Disqus iframe to load
+            try:
+                page.wait_for_selector("div#disqus_thread", timeout=10000)
+            except PlaywrightTimeout:
+                logger.error(f"Disqus iframe didn't load for {module_code}")
+                browser.close()
+                return None, "scrape_failed"
+            
+            html = page.content()
+            browser.close()
+            
+            logger.info(f"Successfully fetched {module_code}")
+            return html, None
+            
     except Exception as e:
         logger.error(f"Error fetching {module_code}: {e}")
         return None, "scrape_failed"
@@ -83,7 +64,6 @@ def extract_disqus_url(html: str, module_code: str) -> Optional[str]:
     iframe = soup.find("div", id="disqus_thread")
     if iframe and iframe.find("iframe"):
         return iframe.find("iframe")["src"]
-    logger.warning(f"No Disqus iframe found for {module_code}")
     return None
 
 
@@ -96,84 +76,65 @@ def fetch_disqus_comments(disqus_url: str) -> Tuple[Optional[str], Optional[str]
         (html, None) if success
         (None, error_code) if failed
     """
-    if not BROWSERLESS_API_KEY:
-        logger.error("BROWSERLESS_API_KEY not set")
-        return None, "scrape_failed"
-    
     try:
-        # JavaScript to click "Load more" button repeatedly
-        load_more_script = """
-        async function loadAllComments() {
-            let clicks = 0;
-            const maxClicks = 200;
+        with sync_playwright() as p:
+            browser = p.chromium.launch(headless=True)
+            page = browser.new_page()
             
-            while (clicks < maxClicks) {
-                const loadMoreButton = document.querySelector('a[data-action="more-posts"]');
-                
-                if (!loadMoreButton || !loadMoreButton.offsetParent) {
-                    // Button not visible, we're done
-                    break;
-                }
-                
-                const beforeCount = document.querySelectorAll('li.post').length;
-                loadMoreButton.click();
-                clicks++;
-                
-                // Wait for new comments to load
-                await new Promise(resolve => setTimeout(resolve, 2000));
-                
-                const afterCount = document.querySelectorAll('li.post').length;
-                
-                // If no new comments loaded after 3 attempts, stop
-                if (afterCount === beforeCount) {
-                    break;
-                }
-            }
+            response = page.goto(disqus_url, wait_until="networkidle", timeout=15000)
             
-            return document.documentElement.outerHTML;
-        }
-        
-        loadAllComments();
-        """
+            if not response.ok:
+                logger.error(f"Failed to load Disqus URL: {disqus_url} with status {response.status}")
+                browser.close()
+                return None, "scrape_failed"
+            
+            # Wait for initial comments to load
+            try:
+                page.wait_for_selector("ul#post-list", timeout=10000)
+            except PlaywrightTimeout: 
+                # No comments found or post-list didn't load
+                logger.warning("No comments found (post-list didn't load)")
+                browser.close()
+                return page.content(), None 
+            
+            # Click "Load more" button until it disappears
+            initial_count = len(page.locator('li.post').all())
+            clicks = 0
+            max_clicks = 200 
+            failures = 0
+            while clicks < max_clicks:
+                try:
+                    load_more = page.locator('a[data-action="more-posts"]')
+                    if not load_more.is_visible(timeout=4000):
+                        break
+                    before_count = len(page.locator('li.post').all())
+                    load_more.click()
+                    clicks += 1
 
-        # Browserless request payload
-        payload = {
-            "url": disqus_url,
-            "gotoOptions": {
-                "waitUntil": "networkidle",
-                "timeout": 30000
-            },
-            "waitFor": 5000,  # Wait 5 seconds for initial load
-            "addScriptTag": [{
-                "content": load_more_script
-            }]
-        }
+                    # Wait for new comments to load
+                    time.sleep(3)
+                    after_count = len(page.locator('li.post').all())
+                    if after_count == before_count:
+                        failures += 1
+                        if failures >= MAX_FAILURES:
+                            logger.warning(f"Stopping after {failures} attempts failed to load new comments")
+                            break
+                    else:
+                        failures = 0
+                except Exception:
+                    break
+            
+            if clicks >= max_clicks:
+                logger.warning(f"WARNING: Reached max clicks ({max_clicks})!!")
 
-        logger.info(f"Fetching Disqus comments via Browserless...")
-        response = requests.post(
-            BROWSERLESS_URL,
-            json=payload,
-            timeout=120  # 2 minute timeout
-        )
-        
-        if response.status_code != 200:
-            logger.error(f"Browserless failed with status {response.status_code}")
-            logger.error(f"Response: {response.text[:500]}")
-            return None, "scrape_failed"
-        
-        html = response.text
-        
-        # Count comments
-        soup = BeautifulSoup(html, 'html.parser')
-        comment_count = len(soup.find_all('li', class_='post'))
-        logger.info(f"Loaded {comment_count} comments from Disqus")
-        
-        return html, None
-    except requests.exceptions.Timeout:
-        logger.error("Browserless request timed out")
-        return None, "scrape_failed"
+            # Get final HTML with all comments loaded
+            html = page.content()
+            browser.close()
+            
+            logger.info(f"Successfully fetched Disqus comments from {disqus_url} (in {clicks + 1} batches)")
+            return html, None
     except Exception as e:
-        logger.error(f"Error with Browserless: {e}")
+        logger.error(f"Error fetching Disqus URL {disqus_url}: {e}")
         return None, "scrape_failed"
 
 
@@ -262,8 +223,6 @@ def scrape_module_reviews(module_code: str, retry_count: int = 3) -> Tuple[List[
             else:
                 return [], "scrape_failed"
         
-        logger.info(f"Fetched NUSMods page for {module_code}, retrieved HTML of length {len(html)}")
-        
         # Step 2: Extract Disqus URL
         disqus_url = extract_disqus_url(html, module_code)
         if not disqus_url:
@@ -301,15 +260,33 @@ def get_comment_count(module_code: str) -> Tuple[Optional[int], Optional[str]]:
         (None, error_code) if failed
     """
     try:
-        comments, error = scrape_module_reviews(module_code)  
-        if error == "no_reviews":
-            return 0, None
+        html, error = fetch_module_page(module_code)
         
         if error:
             return None, error
         
-        return len(comments), None
+        disqus_url = extract_disqus_url(html, module_code)
+        if not disqus_url:
+            return None, "scrape_failed"
         
+        with sync_playwright() as p:
+            browser = p.chromium.launch(headless=True)
+            page = browser.new_page()
+            page.goto(disqus_url, wait_until="networkidle", timeout=15000)
+            
+            try:
+                count_element = page.locator('span.comment-count').first
+                count_text = count_element.inner_text(timeout=5000)
+                count = int(count_text.split()[0])
+                browser.close()
+                logger.info(f"{module_code} has {count} comments")
+                return count, None
+                
+            except Exception as e:
+                logger.warning(f"Could not get comment count for {module_code}: {e}")
+                browser.close()
+                return 0, None  # Assume 0 if can't find count
+                
     except Exception as e:
         logger.error(f"Error getting comment count for {module_code}: {e}")
         return None, "scrape_failed"
