@@ -28,18 +28,45 @@ def fetch_module_page(module_code: str) -> Tuple[Optional[str], Optional[str]]:
     url = f"https://nusmods.com/courses/{module_code}"
     
     try:
-        response = requests.get(url, timeout=10)
+        payload = {
+            "url": url,
+            "gotoOptions": {
+                "waitUntil": "networkidle2",
+                "timeout": 20000
+            },
+            "waitForSelector": {
+                "selector": "iframe#dsq-app, div#disqus_thread, div.container",
+                "timeout": 10000
+            }
+        }
         
-        if response.status_code == 404:
-            logger.warning(f"Module {module_code} not found (404)")
-            return None, "not_found"
+        logger.info(f"Fetching {url} via Browserless...")
+        response = requests.post(BROWSERLESS_URL, json=payload, timeout=60)
         
         if response.status_code != 200:
-            logger.error(f"Failed to fetch {url}: {response.status_code}")
+            logger.error(f"Browserless failed: {response.status_code}")
+            logger.error(f"Response: {response.text[:200]}")
             return None, "scrape_failed"
         
-        return response.text, None
+        html = response.text
         
+        # Check if JavaScript rendered
+        if "Please enable JavaScript" in html:
+            logger.error(f"JavaScript not executed properly")
+            return None, "scrape_failed"
+        
+        # Check if module exists
+        if "Module not found" in html or len(html) < 5000:
+            logger.warning(f"Module {module_code} not found")
+            return None, "not_found"
+        
+        logger.info(f"✅ Fetched {url} ({len(html)} bytes)")
+        
+        return html, None
+        
+    except requests.exceptions.Timeout:
+        logger.error(f"Browserless timeout for {module_code}")
+        return None, "scrape_failed"
     except Exception as e:
         logger.error(f"Error fetching {module_code}: {e}")
         return None, "scrape_failed"
