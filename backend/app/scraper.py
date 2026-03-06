@@ -235,6 +235,8 @@ def scrape_module_reviews(module_code: str, retry_count: int = 3) -> Tuple[List[
             else:
                 return [], "scrape_failed"
         
+        logger.info(f"Fetched NUSMods page for {module_code}, retrieved HTML of length {len(html)}")
+        
         # Step 2: Extract Disqus URL
         disqus_url = extract_disqus_url(html, module_code)
         if not disqus_url:
