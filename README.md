@@ -5,5 +5,3 @@ AI-powered sentiment analysis for NUSMods course reviews.
 - **Backend:** FastAPI, PostgreSQL, Playwright, Gemini 2.5 Flash
 - **Frontend:** Next.js 15, TypeScript, Tailwind CSS
 - **Deployment:** Vercel
-
-Coming Soon...

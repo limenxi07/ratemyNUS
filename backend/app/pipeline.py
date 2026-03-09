@@ -221,6 +221,8 @@ def main():
         # Priority 2: Comment count changed
         elif comment_count != module.last_comment_count:
             needs_update.append(module.code)
+        elif not module.sentiment_data and comment_count == 0:
+            needs_update.append(module.code) # scrape comments
         # Priority 3: Up to date
         else:
             up_to_date.append(module.code)
