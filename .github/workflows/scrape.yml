@@ -8,6 +8,7 @@ on:
 jobs:
   scrape:
     runs-on: ubuntu-latest
+    timeout-minutes: 20 # max runtime = 20 minutes
     steps:
       - uses: actions/checkout@v4
 
@@ -25,4 +26,6 @@ jobs:
       - name: Run scraper
         env:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          FRONTEND_URL: ${{ secrets.FRONTEND_URL }}
         run: python backend/app/pipeline.py
